@@ -1,0 +1,651 @@
+{
+  "info": {
+    "_postman_id": "tibber-ecu-api",
+    "name": "Tibber ECU ESP32 API",
+    "description": "Complete API collection for Tibber Battery ECU (Energy Control Unit)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "contact": {
+      "name": "Tibber Support",
+      "url": "https://www.tibber.com"
+    }
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "password",
+        "value": "{{password}}",
+        "type": "string"
+      },
+      {
+        "key": "username",
+        "value": "admin",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "System & Status",
+      "item": [
+        {
+          "name": "Get System Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/status.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["status.json"]
+            },
+            "description": "Returns overall system health and operational status"
+          },
+          "response": []
+        },
+        {
+          "name": "Get System Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/logs.json?limit=100&level=ERROR",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["logs.json"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "disabled": false
+                },
+                {
+                  "key": "level",
+                  "value": "ERROR",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retrieves system log entries"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Configuration",
+      "item": [
+        {
+          "name": "List All Parameters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/params.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["params.json"]
+            },
+            "description": "Lists all available system parameters"
+          },
+          "response": []
+        },
+        {
+          "name": "Set Parameter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "k",
+                  "value": "battery_min_soc",
+                  "type": "text"
+                },
+                {
+                  "key": "v",
+                  "value": "25",
+                  "type": "text"
+                },
+                {
+                  "key": "store",
+                  "value": "1",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://{{hostname}}/params.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["params.json"]
+            },
+            "description": "Sets a system parameter value"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Node Parameters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/node_params.json?node_id=1",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["node_params.json"],
+              "query": [
+                {
+                  "key": "node_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Gets parameters for a specific remote node"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Network & WiFi",
+      "item": [
+        {
+          "name": "Scan WiFi Networks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/wifiscan.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["wifiscan.json"]
+            },
+            "description": "Returns list of available WiFi networks"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mesh Nodes",
+      "item": [
+        {
+          "name": "List Mesh Nodes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/nodes.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["nodes.json"]
+            },
+            "description": "Lists all discovered nodes in the wireless network"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Node Electrical Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/node_data.json?node_id=1",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["node_data.json"],
+              "query": [
+                {
+                  "key": "node_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Gets raw electrical measurements from a specific node"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Node Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/node_metrics.json?node_id=1",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["node_metrics.json"],
+              "query": [
+                {
+                  "key": "node_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Gets performance metrics (battery, temperature, radio stats) for a node"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Current Transformer Data",
+      "item": [
+        {
+          "name": "Get Latest Clamp Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/ct.json?node_id=1",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["ct.json"],
+              "query": [
+                {
+                  "key": "node_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Retrieves latest current clamp (CT) measurements"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Clamp History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/ct_history.json?node_id=1&limit=50",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["ct_history.json"],
+              "query": [
+                {
+                  "key": "node_id",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Retrieves historical clamp measurements for trend analysis"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Energy Management",
+      "item": [
+        {
+          "name": "Get EMS Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/ems.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["ems.json"]
+            },
+            "description": "Returns comprehensive EMS status (battery, solar, inverter, grid)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get EMS History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/ems_history.json?limit=100",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["ems_history.json"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Retrieves historical EMS data points"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Charging Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/schedule.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["schedule.json"]
+            },
+            "description": "Returns current energy schedule for the day"
+          },
+          "response": []
+        },
+        {
+          "name": "Get PID Controller State",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/pid.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["pid.json"]
+            },
+            "description": "Returns current PID controller parameters and states"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Hub Status",
+      "item": [
+        {
+          "name": "Get EFR Hub Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/efr_hub_status.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["efr_hub_status.json"]
+            },
+            "description": "Returns W868 EFR hub operational status and network stats"
+          },
+          "response": []
+        },
+        {
+          "name": "Get ECU Sensor Configuration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/ecu_sense.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["ecu_sense.json"]
+            },
+            "description": "Returns sensor function assignments and calibration"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Management",
+      "item": [
+        {
+          "name": "Get Current Errors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/error_report.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["error_report.json"]
+            },
+            "description": "Returns active error states across all subsystems"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Error History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/error_history.json?limit=50",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["error_history.json"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "severity",
+                  "value": "ERROR",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retrieves historical error log entries"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "OTA Updates",
+      "item": [
+        {
+          "name": "Get OTA Manifest",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/ota_manifest.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["ota_manifest.json"]
+            },
+            "description": "Returns available OTA updates and progress"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Firmware",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": ""
+              }
+            },
+            "url": {
+              "raw": "http://{{hostname}}/update",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["update"]
+            },
+            "description": "Uploads firmware binary for OTA update"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "File Management",
+      "item": [
+        {
+          "name": "Download File from SPIFFS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/spiffs/config/settings.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["spiffs", "config", "settings.json"]
+            },
+            "description": "Downloads a file from SPIFFS filesystem"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload File to SPIFFS",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": ""
+              }
+            },
+            "url": {
+              "raw": "http://{{hostname}}/upload/spiffs/backup/file.txt",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["upload", "spiffs", "backup", "file.txt"]
+            },
+            "description": "Uploads a file to SPIFFS filesystem"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete File from SPIFFS",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/delete/spiffs/backup/file.txt",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["delete", "spiffs", "backup", "file.txt"]
+            },
+            "description": "Deletes a file from SPIFFS filesystem"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Debugging & Console",
+      "item": [
+        {
+          "name": "Execute CLI Command",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "cmd",
+                  "value": "status",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://{{hostname}}/console.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["console.json"]
+            },
+            "description": "Executes a CLI command and returns output"
+          },
+          "response": []
+        },
+        {
+          "name": "Validate Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "password",
+                  "value": "MySecurePass123!",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://{{hostname}}/validatepassword",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["validatepassword"]
+            },
+            "description": "Validates password strength against NIST standards"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Measurements",
+      "item": [
+        {
+          "name": "Get Mains Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/mains_data.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["mains_data.json"]
+            },
+            "description": "Returns mains voltage and frequency measurements"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Mesh Network Ping Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{hostname}}/warp_ping.json",
+              "protocol": "http",
+              "host": ["{{hostname}}"],
+              "path": ["warp_ping.json"]
+            },
+            "description": "Returns ping/pong response statistics for network nodes"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "hostname",
+      "value": "homevolt-<deviceid>.local",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "your-password-here",
+      "type": "string"
+    }
+  ]
+}

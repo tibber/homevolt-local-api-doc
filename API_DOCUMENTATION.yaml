@@ -1,0 +1,2137 @@
+openapi: 3.0.0
+info:
+  title: Tibber ECU Local Webserver API
+  description: |
+    **Local Webserver API for Tibber Battery ECU (Energy Control Unit)**
+
+    This API provides local HTTP/HTTPS access to the Tibber ECU for monitoring and configuration.
+    The system manages battery charging/discharging, solar generation, and grid integration
+    across a network of wireless sensor nodes.
+
+    ## API Version & Stability
+
+    **Current Version:** `stable_2512_1` (December 2025)
+
+    ⚠️ **Important Notes:**
+    - All endpoints are subject to change between firmware versions
+    - Breaking changes may occur without prior notice
+    - A stable, version-locked API is planned for release in 2026
+    - Test your integration after each firmware update
+
+    ## Enabling the Local API
+
+    **The local webserver is disabled by default.** Contact Tibber support to enable this feature on your device.
+
+    ## Protocol Configuration
+
+    The webserver can operate on **HTTP** (port 80) or **HTTPS** (port 443) based on device configuration parameters.
+
+    **Security Recommendations:**
+    - ✅ **Enable HTTPS** for encrypted communication
+    - ✅ **Set a custom webserver password** (do not rely on default QR-code password)
+    - ✅ Use certificate pinning when possible
+    - ⚠️ HTTP should only be used on trusted local networks
+
+    ## Authentication
+    All endpoints (except captive portal detection) require HTTP Basic Authentication.
+    Username and password format: `admin:<WEBSERVER_PASSWORD>`
+
+    ## Rate Limiting
+    Password authentication is protected with exponential backoff:
+    - 5 failed attempts triggers lockout
+    - Initial lockout: 1 second, doubles with each failure
+    - Maximum lockout: 10 seconds
+    - Counter resets after 5 minutes of inactivity
+
+  version: "stable_2512_1"
+  contact:
+    name: Tibber Support
+    url: https://www.tibber.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://{hostname}
+    description: HTTPS server (port 443) - RECOMMENDED for secure communication
+    variables:
+      hostname:
+        default: homevolt-<deviceid>.local
+        description: Device hostname or IP address
+  - url: http://{hostname}
+    description: HTTP server (port 80) - Use only on trusted networks
+    variables:
+      hostname:
+        default: homevolt-<deviceid>.local
+        description: Device hostname or IP address
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Basic HTTP authentication with admin username and QR-code password
+
+  schemas:
+    # Common response schemas
+    TimestampedData:
+      type: object
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds since epoch)
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: HTTP status code
+        message:
+          type: string
+          description: Error message
+
+  # ============================================================================
+  # PARAMETER DEFINITIONS
+  # ============================================================================
+  # System parameters that can be configured via /params.json endpoint
+  # Parameters are organized by functional group and access level
+
+  ECUParameter:
+    type: object
+    description: ECU (Energy Control Unit) configuration parameters
+    properties:
+      ems_pid_tune:
+        type: array
+        items:
+          type: number
+          format: float
+        description: "PID tune values for the ECU: [P, I, D, anti_windup, cutoff_hz]"
+        example: [0.25, 0.2, 0.1, 10.0, 0.25]
+      ems_load_balance_pid_tune:
+        type: array
+        items:
+          type: number
+          format: float
+        description: "PID tune values for load balance: [P, I, D, anti_windup, cutoff_hz]"
+        example: [300.0, 150.0, 0.0, 1.0, 0.25]
+      ems_idle_power_threshold:
+        type: integer
+        description: Power threshold in Watts for EMS to consider system idle
+        example: 80
+      ems_server:
+        type: string
+        maxLength: 32
+        description: IP address or DNS name of EMS server
+        example: ""
+      ems_grid_code_preset:
+        type: integer
+        description: Grid code preset (e.g., 1=Sweden, 2=Germany)
+        example: 1
+      ems_control_timeout:
+        type: integer
+        description: Control timeout in seconds (0 = disabled)
+        example: 30
+      ems_freq_report_mqtt_period:
+        type: integer
+        description: Frequency report MQTT period in seconds
+        example: 10
+      settings_local:
+        type: boolean
+        description: Enable local mode (prevents remote MQTT schedules)
+        example: false
+      ecu_main_fuse_size_a:
+        type: integer
+        description: Home main fuse size in Amperes
+        example: 0
+      inverter_ffr_test_trigger_freq:
+        type: integer
+        description: FFR test trigger frequency (0.01% units)
+        example: 9996
+      ffr_rearm_timeout_s:
+        type: integer
+        description: FFR rearm timeout in seconds
+        example: 900
+      export_limitation_w:
+        type: integer
+        description: Property export limitation in Watts (0 = unlimited)
+        example: 0
+      import_limitation_w:
+        type: integer
+        description: Property import limitation in Watts (0 = unlimited)
+        example: 0
+      pid_history_select:
+        type: integer
+        description: "Select PID history aggregation: 0=disable, 1=grid, 2-4=lb_charge, 5-7=lb_discharge, 8=export_lim, 9=import_lim"
+        example: 0
+      export_limitation_pid_tune:
+        type: array
+        items:
+          type: number
+          format: float
+        description: "Export limitation PID tune: [P, I, D, anti_windup, cutoff_hz]"
+        example: [0.5, 0.2, 0.1, 1.0, 0.25]
+      import_limitation_pid_tune:
+        type: array
+        items:
+          type: number
+          format: float
+        description: "Import limitation PID tune: [P, I, D, anti_windup, cutoff_hz]"
+        example: [0.5, 0.2, 0.1, 1.0, 0.25]
+      energy_limitation_tune:
+        type: array
+        items:
+          type: number
+          format: float
+        description: "Energy limitation tuning: [tau (s), k, m, comp_eagerness]"
+        example: [10.0, 0.4, 0.7, 0.8]
+      import_energy_limit_wh:
+        type: integer
+        description: Hourly import energy limit in Wh (0 = disabled)
+        example: 0
+      fallback_charge_limit_w:
+        type: integer
+        description: Fallback charge limit in W when grid sensor unavailable
+        example: 0
+      fallback_discharge_limit_w:
+        type: integer
+        description: Fallback discharge limit in W when grid sensor unavailable
+        example: 0
+
+  EMSParameter:
+    type: object
+    description: Energy Management System parameters
+    properties:
+      modbus_enable:
+        type: boolean
+        description: Enable Modbus communication to BMS and Inverter
+        example: true
+      ems_poll_interval_ms:
+        type: array
+        items:
+          type: integer
+        description: "Poll intervals in ms: [system_data, system_info, bms_data, bms_info, control, configuration, mode_selection, pending_versions]"
+        example: [100, 10000, 5000, 10000, 10000, 30000, 30000, 30000]
+      ecu_group_fuse_size_a:
+        type: integer
+        description: Battery system group fuse size in Amperes
+        example: 0
+
+  HMIParameter:
+    type: object
+    description: Human Machine Interface (LED strip) parameters
+    properties:
+      ledstrip_mode:
+        type: string
+        maxLength: 32
+        description: "LED strip mode: 'off'|'on'|'soc'|'dem'|'ser' (empty to disable override)"
+        example: "off"
+      ledstrip_bright_max:
+        type: integer
+        description: Maximum LED brightness (0-100)
+        example: 70
+      ledstrip_bright_min:
+        type: integer
+        description: Minimum LED brightness (0-100)
+        example: 20
+      ledstrip_mode_on_hue:
+        type: integer
+        description: LED hue when on (0-360)
+        example: 280
+      ledstrip_mode_on_saturation:
+        type: integer
+        description: LED saturation (0-100)
+        example: 100
+
+  SystemParameter:
+    type: object
+    description: System-level configuration parameters
+    properties:
+      provreg_enable:
+        type: boolean
+        description: Enable automatic provisioning from server
+        example: true
+      system_service_mode:
+        type: boolean
+        description: Force ECU into service mode
+        example: false
+      system_standalone_mode:
+        type: boolean
+        description: Force ECU into standalone mode
+        example: false
+      ecu_mdns_instance_name:
+        type: string
+        maxLength: 32
+        description: mDNS instance name on local network
+        example: "Homevolt"
+
+  MQTTParameter:
+    type: object
+    description: MQTT encoding and transmission parameters
+    properties:
+      mqtt_log_send_interval_ms:
+        type: array
+        items:
+          type: integer
+        description: "Log send intervals in ms: [operational, service_mode]"
+        example: [5000, 1000]
+      mqtt_metrics_send_interval_ms:
+        type: array
+        items:
+          type: integer
+        description: "Metrics send intervals in ms: [operational, service_mode]"
+        example: [120000, 5000]
+      mqtt_node_data_send_interval_ms:
+        type: array
+        items:
+          type: integer
+        description: "Node data send intervals in ms: [operational, service_mode]"
+        example: [10000, 1000]
+      mqtt_settings_send_interval_ms:
+        type: array
+        items:
+          type: integer
+        description: "Settings send intervals in ms: [operational, service_mode]"
+        example: [60000, 5000]
+      mqtt_status_report_send_interval_ms:
+        type: array
+        items:
+          type: integer
+        description: "Status report send intervals in ms: [operational, service_mode]"
+        example: [60000, 60000]
+      mqtt_ems_data_send_interval_ms:
+        type: array
+        items:
+          type: integer
+        description: "EMS data send intervals in ms: [operational, service_mode]"
+        example: [10000, 10000]
+
+security:
+  - basicAuth: []
+
+paths:
+  # ============================================================================
+  # SYSTEM & STATUS ENDPOINTS
+  # ============================================================================
+
+  /status.json:
+    get:
+      tags:
+        - System Status
+      summary: Get overall system status
+      description: Returns comprehensive system status including WiFi, MQTT, OTA, EFR hub, and EMS states
+      operationId: getSystemStatus
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: System status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wifi_connected:
+                    type: boolean
+                    description: WiFi connection status
+                  mqtt_connected:
+                    type: boolean
+                    description: MQTT broker connection status
+                  ota_state:
+                    type: string
+                    description: Current OTA update state
+                  efr_hub_active:
+                    type: boolean
+                    description: EFR hub operational status
+                  ems_state:
+                    type: string
+                    description: Energy Management System state
+                  system_uptime_ms:
+                    type: integer
+                    description: System uptime in milliseconds
+        401:
+          description: Unauthorized - invalid credentials
+        503:
+          description: Service unavailable
+
+  /logs.json:
+    get:
+      tags:
+        - Debugging
+      summary: Retrieve system logs
+      description: Returns recent system log entries
+      operationId: getSystemLogs
+      security:
+        - basicAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+          description: Maximum number of log entries to return
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [DEBUG, INFO, WARNING, ERROR]
+          description: Filter logs by level
+      responses:
+        200:
+          description: Logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: integer
+                      format: int64
+                    level:
+                      type: string
+                    tag:
+                      type: string
+                    message:
+                      type: string
+        401:
+          description: Unauthorized
+
+  # ============================================================================
+  # PARAMETERS & CONFIGURATION
+  # ============================================================================
+
+  /params.json:
+    get:
+      tags:
+        - Configuration
+        - Parameters
+      summary: Get all system parameters
+      description: |
+        Lists all available system parameters with current values, defaults, types, and access levels.
+
+        Parameters are organized into 5 functional groups:
+        - **ECU Parameters** (21 params): Energy management, grid codes, power limits, PID tuning
+        - **EMS Parameters** (3 params): Modbus control, polling intervals, fuse sizing
+        - **HMI Parameters** (5 params): LED strip visual modes and brightness
+        - **System Parameters** (4 params): Operational modes, provisioning, mDNS
+        - **MQTT Parameters** (6 params): Data transmission intervals
+      operationId: listParameters
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: Parameters retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ecu_params:
+                    $ref: '#/components/schemas/ECUParameter'
+                  ems_params:
+                    $ref: '#/components/schemas/EMSParameter'
+                  hmi_params:
+                    $ref: '#/components/schemas/HMIParameter'
+                  system_params:
+                    $ref: '#/components/schemas/SystemParameter'
+                  mqtt_params:
+                    $ref: '#/components/schemas/MQTTParameter'
+        401:
+          description: Unauthorized
+
+    post:
+      tags:
+        - Configuration
+      summary: Set a system parameter
+      description: Updates a system parameter value. Can optionally persist to NVS storage.
+      operationId: setParameter
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                k:
+                  type: string
+                  description: Parameter name/key
+                v:
+                  type: string
+                  description: Parameter value (will be converted to appropriate type)
+                store:
+                  type: integer
+                  enum: [0, 1]
+                  description: If 1, persist value to NVS storage
+              required:
+                - k
+                - v
+      responses:
+        200:
+          description: Parameter set successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Saved parameter k: 'param_name' v: 'param_value'"
+        400:
+          description: Invalid parameter or value
+        401:
+          description: Unauthorized
+        500:
+          description: Unable to set parameter
+
+  /node_params.json:
+    get:
+      tags:
+        - Remote Nodes
+      summary: Get node parameters
+      description: Retrieves parameters for a specific remote node
+      operationId: getNodeParameters
+      security:
+        - basicAuth: []
+      parameters:
+        - name: node_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: node ID
+      responses:
+        200:
+          description: Node parameters retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        401:
+          description: Unauthorized
+        404:
+          description: Node not found
+
+    post:
+      tags:
+        - Remote Nodes
+      summary: Set node parameters
+      description: Updates parameters on a remote node
+      operationId: setNodeParameters
+      security:
+        - basicAuth: []
+      parameters:
+        - name: node_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: node ID
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                k:
+                  type: string
+                  description: Parameter name
+                v:
+                  type: string
+                  description: Parameter value
+      responses:
+        200:
+          description: Parameter set on remote node
+        401:
+          description: Unauthorized
+        404:
+          description: Node not found
+        503:
+          description: Node unreachable
+
+  # ============================================================================
+  # AUTHENTICATION & VALIDATION
+  # ============================================================================
+
+  /validatepassword:
+    post:
+      tags:
+        - Authentication
+      summary: Validate password strength
+      description: Validates if a password meets NIST SP 800-63B standards
+      operationId: validatePassword
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  minLength: 12
+                  description: Password to validate
+              required:
+                - password
+      responses:
+        200:
+          description: Password validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  issues:
+                    type: array
+                    items:
+                      type: string
+                    description: List of validation failures (if any)
+                  strength:
+                    type: string
+                    enum: [weak, fair, good, strong]
+        401:
+          description: Unauthorized
+
+  # ============================================================================
+  # NETWORK & WIFI
+  # ============================================================================
+
+  /wifiscan.json:
+    get:
+      tags:
+        - Network
+      summary: Scan available WiFi networks
+      description: Returns list of nearby WiFi networks with signal strength and security info
+      operationId: scanWifiNetworks
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: WiFi scan results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    ssid:
+                      type: string
+                      description: Network SSID
+                    bssid:
+                      type: string
+                      description: MAC address (xx:xx:xx:xx:xx:xx format)
+                    channel:
+                      type: integer
+                      description: WiFi channel (1-13)
+                    rssi:
+                      type: integer
+                      description: Signal strength in dBm (typically -30 to -90)
+                    auth_mode:
+                      type: string
+                      enum: [OPEN, WEP, WPA_PSK, WPA2_PSK, WPA_WPA2_PSK, WPA3_PSK]
+                    phy_11b:
+                      type: boolean
+                      description: 802.11b support
+                    phy_11g:
+                      type: boolean
+                      description: 802.11g support
+                    phy_11n:
+                      type: boolean
+                      description: 802.11n (WiFi5) support
+        401:
+          description: Unauthorized
+
+  /generate_204*:
+    get:
+      tags:
+        - Captive Portal
+      summary: Captive portal detection (Apple/Android)
+      description: Standard endpoint for captive portal detection on Apple and Android devices
+      operationId: generateCaptivePortal204
+      security: []
+      responses:
+        204:
+          description: No content (triggers captive portal on client)
+
+  /hotspot-detect.html:
+    get:
+      tags:
+        - Captive Portal
+      summary: Apple captive portal detection
+      operationId: appleHotspotDetect
+      security: []
+      responses:
+        204:
+          description: Triggers portal on Apple devices
+
+  /connecttest.txt:
+    get:
+      tags:
+        - Captive Portal
+      summary: Android captive portal detection
+      operationId: androidConnectTest
+      security: []
+      responses:
+        204:
+          description: Triggers portal on Android devices
+
+  /ncsi.txt:
+    get:
+      tags:
+        - Captive Portal
+      summary: Windows captive portal detection
+      operationId: windowsNcsi
+      security: []
+      responses:
+        204:
+          description: Triggers portal on Windows devices
+
+  /redirect:
+    get:
+      tags:
+        - Captive Portal
+      summary: Portal redirect endpoint
+      operationId: portalRedirect
+      security: []
+      responses:
+        302:
+          description: Redirect to captive portal
+
+  # ============================================================================
+  # NODE MANAGEMENT & DATA
+  # ============================================================================
+
+  /nodes.json:
+    get:
+      tags:
+        - Remote Nodes
+      summary: Get network nodes
+      description: Lists all discovered nodes in the wireless network with status and OTA info
+      operationId: listNodes
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: Node list retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    node_id:
+                      type: integer
+                      description: Unique node identifier
+                    node_type:
+                      type: string
+                      description: Node type (e.g., CLAMP, METER, HUB)
+                    last_seen:
+                      type: integer
+                      format: int64
+                      description: Unix timestamp of last message
+                    signal_strength:
+                      type: integer
+                      description: RSSI in dBm
+                    hop_count:
+                      type: integer
+                      description: hops to reach node
+                    fw_version:
+                      type: string
+                      description: Firmware version
+                    ota_available:
+                      type: boolean
+                      description: OTA update available
+                    battery_percent:
+                      type: number
+                      description: Battery level (0-100%)
+        401:
+          description: Unauthorized
+
+  /node_data.json:
+    get:
+      tags:
+        - Remote Nodes
+      summary: Get raw meter data for node
+      description: Retrieves raw electrical measurements from a specific node
+      operationId: getNodeData
+      security:
+        - basicAuth: []
+      parameters:
+        - name: node_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: node ID
+      responses:
+        200:
+          description: Node data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  node_id:
+                    type: integer
+                  voltage_rms:
+                    type: number
+                    description: RMS voltage (V)
+                  current_rms:
+                    type: number
+                    description: RMS current (A)
+                  power_active:
+                    type: number
+                    description: Active power (W)
+                  power_reactive:
+                    type: number
+                    description: Reactive power (VAR)
+                  power_apparent:
+                    type: number
+                    description: Apparent power (VA)
+                  power_factor:
+                    type: number
+                    description: Power factor (0-1)
+                  frequency:
+                    type: number
+                    description: Frequency (Hz)
+                  timestamp:
+                    type: integer
+                    format: int64
+        401:
+          description: Unauthorized
+        404:
+          description: Node not found
+
+  /node_metrics.json:
+    get:
+      tags:
+        - Remote Nodes
+      summary: Get node metrics
+      description: Retrieves performance metrics and diagnostics for a remote node (battery, temperature, radio stats)
+      operationId: getNodeMetrics
+      security:
+        - basicAuth: []
+      parameters:
+        - name: node_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: node ID
+      responses:
+        200:
+          description: Node metrics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  node_id:
+                    type: integer
+                  battery_voltage:
+                    type: number
+                    description: Battery voltage (V)
+                  battery_percent:
+                    type: number
+                    description: Estimated charge (%)
+                  temperature:
+                    type: number
+                    description: Device temperature (°C)
+                  rssi:
+                    type: integer
+                    description: Signal strength (dBm)
+                  packet_loss:
+                    type: number
+                    description: Packet loss percentage
+                  uptime_ms:
+                    type: integer
+                    description: Device uptime (ms)
+        401:
+          description: Unauthorized
+
+  # ============================================================================
+  # CURRENT TRANSFORMER (CT) DATA
+  # ============================================================================
+
+  /ct.json:
+    get:
+      tags:
+        - Current Transformer Data
+      summary: Get clamp meter data
+      description: Retrieves latest current clamp (CT) measurements for a node
+      operationId: getClampData
+      security:
+        - basicAuth: []
+      parameters:
+        - name: node_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: node ID
+      responses:
+        200:
+          description: Clamp data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  node_id:
+                    type: integer
+                  clamp_id:
+                    type: integer
+                    description: Clamp index (0-3 typically)
+                  rms_current_a:
+                    type: number
+                    description: RMS current (Amperes)
+                  rms_voltage_v:
+                    type: number
+                    description: RMS voltage (Volts)
+                  phase_diff_degrees:
+                    type: number
+                    description: Phase difference (degrees)
+                  power_watts:
+                    type: number
+                    description: Power (Watts)
+                  clamp_status:
+                    type: string
+                    enum: [OK, ERROR, NOT_CONNECTED]
+                  timestamp:
+                    type: integer
+                    format: int64
+        401:
+          description: Unauthorized
+
+  /ct_data.json:
+    get:
+      tags:
+        - Current Transformer Data
+      summary: Get versioned clamp data
+      description: Retrieves raw versioned clamp meter data with optional time filtering
+      operationId: getClampDataVersioned
+      security:
+        - basicAuth: []
+      parameters:
+        - name: node_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: from
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Start timestamp (Unix epoch)
+        - name: to
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: End timestamp (Unix epoch)
+      responses:
+        200:
+          description: Versioned clamp data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        401:
+          description: Unauthorized
+
+  /ct_history.json:
+    get:
+      tags:
+        - Current Transformer Data
+      summary: Get clamp history
+      description: Retrieves historical clamp measurements for trend analysis and troubleshooting
+      operationId: getClampHistory
+      security:
+        - basicAuth: []
+      parameters:
+        - name: node_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+          description: Number of history entries to return
+        - name: from
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Start timestamp
+      responses:
+        200:
+          description: History entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: integer
+                      format: int64
+                    rms_current_a:
+                      type: number
+                    rms_voltage_v:
+                      type: number
+                    power_watts:
+                      type: number
+        401:
+          description: Unauthorized
+
+  # ============================================================================
+  # ENERGY MANAGEMENT SYSTEM (EMS)
+  # ============================================================================
+
+  /ems.json:
+    get:
+      tags:
+        - Energy Management
+      summary: Get EMS status
+      description: Returns comprehensive Energy Management System status including battery, solar, inverter, and grid data
+      operationId: getEmsStatus
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: EMS status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timestamp:
+                    type: integer
+                    format: int64
+                  battery_voltage:
+                    type: number
+                    description: Battery voltage (V)
+                  battery_current:
+                    type: number
+                    description: Battery current (A, positive=charge)
+                  battery_soc:
+                    type: number
+                    description: State of charge (%)
+                  battery_soh:
+                    type: number
+                    description: State of health (%)
+                  battery_power:
+                    type: number
+                    description: Power (W, positive=discharge)
+                  inverter_power:
+                    type: number
+                    description: Inverter output (W)
+                  solar_power:
+                    type: number
+                    description: Solar generation (W)
+                  grid_power:
+                    type: number
+                    description: Grid power (W, positive=import)
+                  grid_frequency:
+                    type: number
+                    description: Grid frequency (Hz)
+                  load_power:
+                    type: number
+                    description: House load (W)
+                  ems_state:
+                    type: string
+                    description: Current EMS operating state
+                  predictions:
+                    type: object
+                    description: Solar/consumption predictions for today
+        401:
+          description: Unauthorized
+
+  /ems_history.json:
+    get:
+      tags:
+        - Energy Management
+      summary: Get EMS history
+      description: Retrieves historical EMS data points for analysis and charting
+      operationId: getEmsHistory
+      security:
+        - basicAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 1000
+          description: Number of history points to return
+        - name: from
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Start timestamp
+      responses:
+        200:
+          description: Historical EMS data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        401:
+          description: Unauthorized
+
+  /ems_pid_history.json:
+    get:
+      tags:
+        - Energy Management
+      summary: Get PID controller history
+      description: Retrieves historical PID controller debug data for algorithm tuning
+      operationId: getPidHistory
+      security:
+        - basicAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 500
+      responses:
+        200:
+          description: PID history data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        401:
+          description: Unauthorized
+
+  /schedule.json:
+    get:
+      tags:
+        - Energy Management
+      summary: Get charging schedule
+      description: Returns current energy schedule for the day
+      operationId: getSchedule
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: Schedule retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        start_time:
+                          type: string
+                          format: time
+                        end_time:
+                          type: string
+                          format: time
+                        mode:
+                          type: string
+                          enum: [CHARGE, DISCHARGE, IDLE]
+                        target_soc:
+                          type: number
+        401:
+          description: Unauthorized
+
+  /pid.json:
+    get:
+      tags:
+        - Energy Management
+      summary: Get PID controller state
+      description: Returns current PID controller parameters and states for all loops
+      operationId: getPidState
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: PID state retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  battery_charge_pid:
+                    type: object
+                    properties:
+                      kp:
+                        type: number
+                      ki:
+                        type: number
+                      kd:
+                        type: number
+                      setpoint:
+                        type: number
+                      output:
+                        type: number
+                  battery_discharge_pid:
+                    type: object
+                  grid_import_limit_pid:
+                    type: object
+        401:
+          description: Unauthorized
+
+  # ============================================================================
+  # HUB & SUBSYSTEM STATUS
+  # ============================================================================
+
+  /efr_hub_status.json:
+    get:
+      tags:
+        - Hub Status
+      summary: Get EFR hub status
+      description: Returns W868 EFR hub operational status, network stats, and OTA info
+      operationId: getEfrHubStatus
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: Hub status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hub_connected:
+                    type: boolean
+                  radio_active:
+                    type: boolean
+                  node_count:
+                    type: integer
+                    description: Number of connected nodes
+                  ota_enabled:
+                    type: boolean
+                  ota_updates_available:
+                    type: integer
+                  rssi:
+                    type: integer
+                    description: Hub signal strength
+                  uptime_ms:
+                    type: integer
+        401:
+          description: Unauthorized
+
+  /ecu_sense.json:
+    get:
+      tags:
+        - Hub Status
+      summary: Get ECU sensor assignments
+      description: Returns sensor function assignments and calibration data
+      operationId: getEcuSenseConfig
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: Sensor configuration
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    channel:
+                      type: integer
+                    function:
+                      type: string
+                      enum: [GRID, SOLAR, LOAD, BATTERY]
+                    node_id:
+                      type: integer
+                    calibration:
+                      type: number
+        401:
+          description: Unauthorized
+
+  # ============================================================================
+  # ERROR MANAGEMENT
+  # ============================================================================
+
+  /error_report.json:
+    get:
+      tags:
+        - Error Management
+      summary: Get current errors
+      description: Returns active error states across all subsystems
+      operationId: getErrorReport
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: Error report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timestamp:
+                    type: integer
+                    format: int64
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        subsystem:
+                          type: string
+                        error_code:
+                          type: integer
+                        description:
+                          type: string
+                        severity:
+                          type: string
+                          enum: [INFO, WARNING, ERROR, CRITICAL]
+        401:
+          description: Unauthorized
+
+  /error_history.json:
+    get:
+      tags:
+        - Error Management
+      summary: Get error history
+      description: Retrieves historical error log entries
+      operationId: getErrorHistory
+      security:
+        - basicAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [INFO, WARNING, ERROR, CRITICAL]
+      responses:
+        200:
+          description: Error history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        401:
+          description: Unauthorized
+
+  # ============================================================================
+  # OTA (Over-The-Air) UPDATES
+  # ============================================================================
+
+  /ota_manifest.json:
+    get:
+      tags:
+        - OTA Updates
+      summary: Get OTA manifest
+      description: Returns available OTA updates, current versions, and update progress
+      operationId: getOtaManifest
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: OTA manifest retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timestamp:
+                    type: integer
+                  updates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product_id:
+                          type: integer
+                        current_version:
+                          type: string
+                        available_version:
+                          type: string
+                        file_size:
+                          type: integer
+                        manifest_url:
+                          type: string
+                        state:
+                          type: string
+                          enum: [IDLE, DOWNLOADING, VERIFYING, INSTALLING, COMPLETE, ERROR]
+                        progress_percent:
+                          type: integer
+                        up2date:
+                          type: boolean
+        401:
+          description: Unauthorized
+
+  /update:
+    post:
+      tags:
+        - OTA Updates
+      summary: Upload firmware update
+      description: |
+        Uploads firmware binary for OTA update.
+        The file should be a complete firmware image.
+      operationId: uploadFirmware
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        200:
+          description: Firmware uploaded and update initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+        400:
+          description: Invalid firmware file
+        401:
+          description: Unauthorized
+        507:
+          description: Insufficient storage space
+
+  # ============================================================================
+  # FILE MANAGEMENT & STORAGE
+  # ============================================================================
+
+  /spiffs/{filepath}:
+    get:
+      tags:
+        - File Management
+      summary: Download file from SPIFFS
+      description: Downloads a file from the SPIFFS filesystem
+      operationId: downloadFile
+      security:
+        - basicAuth: []
+      parameters:
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Path to file (e.g., config/data.json)
+      responses:
+        200:
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        401:
+          description: Unauthorized
+        404:
+          description: File not found
+
+  /upload/spiffs/{filepath}:
+    post:
+      tags:
+        - File Management
+      summary: Upload file to SPIFFS
+      description: Uploads a file to the SPIFFS filesystem
+      operationId: uploadFile
+      security:
+        - basicAuth: []
+      parameters:
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        200:
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  filename:
+                    type: string
+                  size:
+                    type: integer
+        401:
+          description: Unauthorized
+        507:
+          description: Insufficient storage space
+
+  /delete/spiffs/{filepath}:
+    post:
+      tags:
+        - File Management
+      summary: Delete file from SPIFFS
+      description: Deletes a file from the SPIFFS filesystem
+      operationId: deleteFile
+      security:
+        - basicAuth: []
+      parameters:
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: File deleted successfully
+        401:
+          description: Unauthorized
+        404:
+          description: File not found
+
+  # ============================================================================
+  # CONSOLE & DEBUGGING
+  # ============================================================================
+
+  /console.json:
+    post:
+      tags:
+        - Debugging
+      summary: Execute CLI command
+      description: Executes a CLI command and returns the output. Used for debugging and administrative tasks.
+      operationId: executeConsoleCommand
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                cmd:
+                  type: string
+                  description: CLI command to execute (e.g., "help", "status", "restart")
+              required:
+                - cmd
+      responses:
+        200:
+          description: Command executed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  command:
+                    type: string
+                  output:
+                    type: string
+                  exit_code:
+                    type: integer
+        400:
+          description: Invalid command
+        401:
+          description: Unauthorized
+
+  # ============================================================================
+  # MEASUREMENTS & DATA
+  # ============================================================================
+
+  /mains_data.json:
+    get:
+      tags:
+        - Measurements
+      summary: Get mains measurements
+      description: Returns mains voltage and frequency measurements
+      operationId: getMainsData
+      security:
+        - basicAuth: []
+      parameters:
+        - name: timestamp
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Specific timestamp to retrieve data for (optional)
+      responses:
+        200:
+          description: Mains data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  voltage_rms:
+                    type: number
+                    description: RMS voltage (V)
+                  frequency:
+                    type: number
+                    description: Frequency (Hz)
+                  timestamp:
+                    type: integer
+                    format: int64
+        401:
+          description: Unauthorized
+
+  /warp_ping.json:
+    get:
+      tags:
+        - Network Testing
+      summary: Get network ping statistics
+      description: Returns ping/pong response statistics for network nodes
+      operationId: getPingStats
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: Ping statistics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    node_id:
+                      type: integer
+                    avg_ping_ms:
+                      type: number
+                    min_ping_ms:
+                      type: number
+                    max_ping_ms:
+                      type: number
+                    loss_percent:
+                      type: number
+        401:
+          description: Unauthorized
+
+tags:
+  - name: System Status
+    description: Overall system health and status endpoints
+  - name: Configuration
+    description: System parameter management
+  - name: Authentication
+    description: Security and authentication endpoints
+  - name: Network
+    description: WiFi and network configuration
+  - name: Captive Portal
+    description: Captive portal detection endpoints
+  - name: Remote Nodes
+    description: Network node management and data
+  - name: Current Transformer Data
+    description: Electrical current/voltage measurements
+  - name: Energy Management
+    description: Battery, solar, and grid power management
+  - name: Hub Status
+    description: Wireless hub and sensor configuration status
+  - name: Error Management
+    description: Error reporting and history
+  - name: OTA Updates
+    description: Firmware update management
+  - name: File Management
+    description: SPIFFS filesystem operations
+  - name: Debugging
+    description: Logging and CLI access
+  - name: Measurements
+    description: Electrical measurements and diagnostics
+  - name: Network Testing
+    description: Network quality and performance testing
+  - name: Console Commands
+    description: UART/Serial console CLI commands for system debugging and configuration
+
+# ============================================================================
+# CONSOLE COMMANDS REFERENCE
+# ============================================================================
+# The following section documents all registered ESP-IDF console commands
+# accessible via the UART serial console. These commands complement the HTTP API
+# and provide low-level debugging, configuration, and system control capabilities.
+
+x-console-commands:
+  System Information:
+    - command: info
+      help: "Get info of chip and SDK"
+      description: "Displays comprehensive system information including ESP32 chip details, IDF version, firmware versions, board configuration, uptime, network status, and partition information"
+      args: []
+      example: "> info"
+
+    - command: reset_hard
+      help: "Reset the device by pulling HMI_BTN1 high, and wait for hardware to reset"
+      description: "Triggers a hardware reset by pulling GPIO_48 (HMI_BTN1) high. Waits for the hardware to detect and perform the reset"
+      args: []
+      example: "> reset_hard"
+
+    - command: event_dump
+      help: "Dump event loop info"
+      description: "Displays detailed information about all registered event loops and their handlers (only available if CONFIG_ESP_EVENT_LOOP_PROFILING is enabled)"
+      args: []
+      example: "> event_dump"
+      note: "Requires CONFIG_ESP_EVENT_LOOP_PROFILING to be enabled in sdkconfig"
+
+  Task & System Monitoring:
+    - command: echo
+      help: "Print a string"
+      description: "Echoes the provided arguments to the console output"
+      args:
+        - "<string>: Text to echo"
+      example: "> echo Hello World"
+
+    - command: tasks
+      help: "Get information about running tasks"
+      description: "Displays list of all running FreeRTOS tasks with their status, priority, high water mark, and CPU affinity"
+      args: []
+      example: "> tasks"
+      note: "Requires CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS"
+
+  Time & Clock:
+    - command: time
+      help: "Get local date/time information"
+      description: "Displays current date/time, system uptime, and tick count. Supports subcommands: date (default), uptime, ticks"
+      args:
+        - "[date|uptime|ticks]: Optional subcommand (default: all)"
+      examples:
+        - "> time date"
+        - "> time uptime"
+        - "> time"
+
+  Console History:
+    - command: history
+      help: "Print command history"
+      description: "Displays the command history from the current console session"
+      args: []
+      example: "> history"
+      note: "Requires CONFIG_TIBBER_HISTORY_FILE"
+
+  Memory Management:
+    - command: free
+      help: "Show available memory"
+      description: "Displays heap memory information including free memory, allocated memory, and memory usage statistics"
+      args: []
+      example: "> free"
+
+    - command: mem
+      help: "Show memory information and dump memory"
+      description: "Complex memory information tool that shows heap statistics and can dump memory regions"
+      args:
+        - "dump [address] [length]: Dump memory at address"
+        - "read [address]: Read single value"
+        - "write [address] [value]: Write value to address"
+      examples:
+        - "> mem dump 0x40000000 128"
+        - "> mem read 0x40000000"
+
+    - command: heap_trace_start
+      help: "Start heap tracing"
+      description: "Enables heap memory tracing to track allocations and deallocations"
+      args: []
+      example: "> heap_trace_start"
+
+    - command: heap_trace_stop
+      help: "Stop heap tracing"
+      description: "Stops heap memory tracing"
+      args: []
+      example: "> heap_trace_stop"
+
+    - command: heap_trace_dump
+      help: "Dump heap trace information"
+      description: "Displays collected heap trace data showing memory allocation patterns"
+      args: []
+      example: "> heap_trace_dump"
+
+  Logging Control:
+    - command: dmesg
+      help: "Display system log buffer"
+      description: "Prints the system log buffer (kernel message buffer equivalent)"
+      args: []
+      example: "> dmesg"
+
+    - command: log_list
+      help: "List all loggers and their current log levels"
+      description: "Shows all registered log tags and their current verbosity levels"
+      args:
+        - "[search]: Optional filter string to search log tag names"
+      examples:
+        - "> log_list"
+        - "> log_list mqtt"
+
+    - command: log_set
+      help: "Set log level for a specific tag"
+      description: "Changes the verbosity level for a specific logger tag"
+      args:
+        - "<name>: Log tag name"
+        - "<level>: Log level (0=None, 1=Error, 2=Warn, 3=Info, 4=Debug, 5=Verbose)"
+      examples:
+        - "> log_set mqtt 4"
+        - "> log_set * 3"
+
+    - command: log_reset
+      help: "Reset all log levels to default"
+      description: "Resets all logger levels to the specified default level or configuration default"
+      args:
+        - "[level]: Optional default log level"
+      examples:
+        - "> log_reset"
+        - "> log_reset 3"
+
+  Filesystem Operations:
+    - command: ls
+      help: "List files in directory"
+      description: "Lists all files and subdirectories in the specified path"
+      args:
+        - "<path>: Directory path to list"
+      example: "> ls /spiffs"
+
+    - command: cat
+      help: "Display or create file contents"
+      description: "Displays file contents or creates a new file with optional data"
+      args:
+        - "<path>: File path"
+        - "[data]: Optional data to write (creates file if not present)"
+      examples:
+        - "> cat /spiffs/config.json"
+        - "> cat /spiffs/newfile.txt 'file contents'"
+
+    - command: sha1
+      help: "Calculate SHA1 hash of a file"
+      description: "Computes and displays the SHA1 checksum of a file"
+      args:
+        - "<path>: Path to file to hash"
+      example: "> sha1 /spiffs/config.json"
+
+    - command: rm
+      help: "Remove a file or directory"
+      description: "Deletes a file or directory from the filesystem"
+      args:
+        - "<path>: Path to remove"
+      example: "> rm /spiffs/oldfile.txt"
+
+    - command: format
+      help: "Format the filesystem"
+      description: "Formats the SPIFFS filesystem, erasing all files"
+      args: []
+      example: "> format"
+      warning: "This will erase all files on the filesystem!"
+
+  Parameter Management:
+    - command: param_list
+      help: "List all parameters"
+      description: "Displays all configured system parameters and their current values"
+      args:
+        - "[search]: Optional filter string"
+      examples:
+        - "> param_list"
+        - "> param_list battery"
+
+    - command: param_get
+      help: "Get parameter value"
+      description: "Retrieves the current value of a specific parameter"
+      args:
+        - "<name>: Parameter name"
+      example: "> param_get battery_mode"
+
+    - command: param_set
+      help: "Set parameter value"
+      description: "Sets a parameter to a new value (stored in memory, use param_store to persist)"
+      args:
+        - "<name>: Parameter name"
+        - "<value>: New value"
+      example: "> param_set battery_mode 1"
+
+    - command: param_reset
+      help: "Reset parameters to defaults"
+      description: "Resets all or specific parameters to their default values"
+      args:
+        - "[name]: Optional specific parameter to reset (resets all if omitted)"
+      examples:
+        - "> param_reset"
+        - "> param_reset battery_mode"
+
+    - command: param_store
+      help: "Store all parameter changes to flash"
+      description: "Persists all current parameter values to non-volatile storage"
+      args: []
+      example: "> param_store"
+
+    - command: param_load
+      help: "Load all parameters from flash"
+      description: "Reloads all parameters from persistent storage, discarding any unsaved changes"
+      args: []
+      example: "> param_load"
+
+  Crash Dump Management:
+    - command: coredump_crash
+      help: "Trigger a crash for testing"
+      description: "Intentionally crashes the ESP32 to generate a core dump for debugging"
+      args: []
+      example: "> coredump_crash"
+      warning: "This will crash the device! Use only for testing."
+
+    - command: coredump_upload
+      help: "Upload core dump to server"
+      description: "Sends any saved core dump to a specified server for analysis"
+      args:
+        - "[url]: Server URL to send core dump"
+        - "[filename]: Filename for the dump"
+        - "[-e/--erase]: Erase dump after successful upload"
+      examples:
+        - "> coredump_upload http://example.com/coredump"
+        - "> coredump_upload http://example.com/coredump mydevice.dmp -e"
+
+    - command: coredump_erase
+      help: "Erase core dump partition"
+      description: "Clears any stored core dump from the dedicated partition"
+      args: []
+      example: "> coredump_erase"
+
+  Energy Management System (EMS):
+    - command: ems
+      help: "Show EMS system status"
+      description: "Displays Energy Management System state including battery, solar, and grid information"
+      args: []
+      example: "> ems"
+
+    - command: ems_reset
+      help: "Reset EMS state"
+      description: "Resets the EMS system to initial state"
+      args: []
+      example: "> ems_reset"
+
+    - command: modbus_read
+      help: "Read modbus register"
+      description: "Reads a register from the Modbus interface"
+      args:
+        - "<address>: Modbus register address"
+      example: "> modbus_read 1000"
+
+    - command: modbus_write
+      help: "Write modbus register"
+      description: "Writes a value to a Modbus register"
+      args:
+        - "<address>: Modbus register address"
+        - "<value>: Value to write"
+      example: "> modbus_write 1000 42"
+
+    - command: ems_config_set
+      help: "Set EMS configuration"
+      description: "Configures EMS parameters like mode, limits, and behavior"
+      args:
+        - "<param>: Configuration parameter"
+        - "<value>: New value"
+      example: "> ems_config_set max_charge_current 16"
+
+  Schedule Management:
+    - command: sched_add
+      help: "Add a new schedule"
+      description: "Creates a new energy schedule with specified time and mode"
+      args:
+        - "<time>: Schedule time (HH:MM format)"
+        - "<mode>: Mode (charge/discharge/idle)"
+      example: "> sched_add 08:00 charge"
+
+    - command: sched_set
+      help: "Modify an existing schedule"
+      description: "Updates parameters of an existing schedule"
+      args:
+        - "<id>: Schedule ID"
+        - "<param>: Parameter to modify"
+        - "<value>: New value"
+      example: "> sched_set 0 mode discharge"
+
+    - command: sched_del
+      help: "Delete a schedule"
+      description: "Removes a schedule by ID"
+      args:
+        - "<id>: Schedule ID to delete"
+      example: "> sched_del 0"
+
+    - command: sched_list
+      help: "List all schedules"
+      description: "Displays all configured schedules with their parameters"
+      args: []
+      example: "> sched_list"
+
+    - command: sched_clear
+      help: "Clear all schedules"
+      description: "Removes all configured schedules"
+      args: []
+      example: "> sched_clear"
+
+  ECU Control Commands:
+    - command: ecu_ffr_rearm
+      help: "Rearm FFR (Force Feed Rearm) immediately if in standby"
+      description: "Resets the Force Feed Rearm state to allow immediate restart"
+      args: []
+      example: "> ecu_ffr_rearm"
+
+    - command: ecu_ctx_reset
+      help: "Reset ECU context"
+      description: "Resets the ECU internal context and state machines"
+      args: []
+      example: "> ecu_ctx_reset"
+
+    - command: ecu_network
+      help: "Show secure transport status"
+      description: "Displays the status of network security and transport layer"
+      args: []
+      example: "> ecu_network"
+
+    - command: ecu_network_reset
+      help: "Reinitialize secure transport"
+      description: "Resets and reinitializes the secure network transport"
+      args: []
+      example: "> ecu_network_reset"
+
+  Sensor Assignment (ECU Sense):
+    - command: ecu_sense_assign
+      help: "Assign a sensor node to a function"
+      description: "Maps a wireless sensor node to a specific measurement function"
+      args:
+        - "<node_id>: Node ID to assign"
+        - "<function>: Function type"
+        - "[-i/--interface]: Optional interface specification"
+      example: "> ecu_sense_assign node_001 power"
+
+    - command: ecu_sense_clear
+      help: "Clear sensor assignments"
+      description: "Removes sensor assignments (all or specific node)"
+      args:
+        - "[node_id]: Optional specific node to clear (clears all if omitted)"
+      examples:
+        - "> ecu_sense_clear"
+        - "> ecu_sense_clear node_001"
+
+    - command: ecu_sense_list
+      help: "List all sensor assignments"
+      description: "Shows all current sensor node assignments and their configurations"
+      args: []
+      example: "> ecu_sense_list"
+
+  LTE Modem Control:
+    - command: lte_info
+      help: "Show LTE modem information"
+      description: "Displays LTE modem status, signal strength, network info, and firmware version"
+      args: []
+      example: "> lte_info"
+
+    - command: lte_power
+      help: "Control LTE modem power"
+      description: "Powers the LTE modem on or off"
+      args:
+        - "<power>: 1=ON, 0=OFF"
+      examples:
+        - "> lte_power 1"
+        - "> lte_power 0"
+
+    - command: lte_restart
+      help: "Restart LTE modem"
+      description: "Performs a complete reset and restart of the LTE modem"
+      args: []
+      example: "> lte_restart"
+
+    - command: lte_band
+      help: "Change network band"
+      description: "Switches the LTE modem to a different network band"
+      args:
+        - "<band>: Band number (e.g., 20, 28, 32)"
+      example: "> lte_band 20"
+
+    - command: lte_sim_iccid
+      help: "Get SIM ICCID"
+      description: "Displays the ICCID (Integrated Circuit Card ID) of the inserted SIM card"
+      args: []
+      example: "> lte_sim_iccid"
+
+x-console-usage-notes: |
+  ## Accessing the Console
+
+  The console is accessible via UART serial connection to the device at:
+  - **Port**: UART0 (default serial port)
+  - **Baud Rate**: 115200 bps
+  - **Data Bits**: 8
+  - **Stop Bits**: 1
+  - **Parity**: None
+  - **Flow Control**: None
+
+  Use a serial terminal like minicom, PuTTY, or screen to connect:
+  ```bash
+  screen /dev/ttyUSB0 115200
+  minicom -D /dev/ttyUSB0
+  ```
+
+  ## Command Features
+
+  - **Tab Completion**: Press TAB to auto-complete commands
+  - **Command History**: Press UP/DOWN arrows to browse history (when CONFIG_TIBBER_HISTORY_FILE is enabled)
+  - **Help**: Most commands support a --help or -h flag for additional information
+  - **Ctrl+C**: Interrupt current command
+  - **Ctrl+U**: Clear current line
+
+  ## Common Workflows
+
+  ### System Diagnostics
+  1. Get system info: `info`
+  2. Check running tasks: `tasks`
+  3. Check memory: `free`
+  4. View logs: `log_list` then `log_set <tag> <level>`
+  5. Monitor specific subsystem: `dmesg`
+
+  ### Configuration Management
+  1. List parameters: `param_list`
+  2. Get specific value: `param_get <name>`
+  3. Set value: `param_set <name> <value>`
+  4. Save to flash: `param_store`
+
+  ### Energy Management
+  1. Check EMS status: `ems`
+  2. View schedules: `sched_list`
+  3. Create schedule: `sched_add <time> <mode>`
+  4. Persist changes: `param_store`
+
+  ### Network Debugging
+  1. Check LTE status: `lte_info`
+  2. Check network: `ecu_network`
+  3. View logs: `log_set * 4` (set all logs to debug)
+  4. Capture output: Redirect serial output to file in terminal program
+
+  ### File Management
+  1. List files: `ls /spiffs`
+  2. View content: `cat /spiffs/file.txt`
+  3. Verify integrity: `sha1 /spiffs/file.txt`
+  4. Delete: `rm /spiffs/file.txt`
+  5. Format (careful!): `format` (erases entire filesystem)
