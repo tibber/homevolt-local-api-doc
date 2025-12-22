@@ -1,4 +1,67 @@
-# Tibber ECU API Documentation Index
+# Homevolt Local API – Developer Overview
+
+The Homevolt Local API is a **device-hosted HTTP/REST API** exposed by the Homevolt battery's embedded ECU (Energy Control Unit). It provides **direct, low-latency access over the local network** for monitoring, configuration, and control of the Homevolt system.
+
+This API is intended **exclusively for local integrations**, such as Home Assistant, Node-RED, custom scripts and dashboards etc.
+
+The API runs entirely on the Homevolt device and is accessed via its local hostname
+(e.g. `homevolt-<deviceid>.local`) or LAN IP address.
+All communication remains **within the local network** and does not depend on Tibber cloud services.
+
+---
+
+## Functional scope
+
+Using the Local API, clients can:
+
+- Read system and battery status (SOC, power, firmware, uptime)
+- Monitor real-time energy and measurement data (grid, inverter, CTs)
+- Configure system and EMS parameters
+- Control battery behavior (e.g. minimum SOC, power limits, schedules)
+- Retrieve diagnostics, logs, and node information
+
+---
+
+## Intended usage and limitations
+
+- Designed for **local, on-premise control only**
+- Not a public or cloud-hosted API
+- Not intended for energy supplier, VPP, or third-party remote control
+
+---
+
+## ⚠️ Developer disclaimer (use at your own risk)
+
+This API is provided for **advanced users and developers**.
+
+By using the Homevolt Local API, you acknowledge that:
+
+- You are responsible for how the API is used and integrated
+- Incorrect usage or misconfiguration **may affect system behavior, performance, or availability**
+- Tibber does **not** guarantee stability, support, or compatibility for custom integrations
+- Future firmware updates may change or deprecate API behavior
+
+**Recommendations:**
+
+- Test integrations carefully in controlled environments
+- Avoid writing to parameters you do not fully understand
+- Prefer read-only access where possible
+
+---
+
+## API enablement requirement
+
+> ⚠️ **The Local API is disabled by default.**
+
+API access must be explicitly enabled on the Homevolt device.
+
+To enable the API, the customer must contact **Tibber Customer Support**, who will verify eligibility and activate access.
+
+Until the API is enabled:
+
+- Webserver endpoints are unavailable
+- Authentication credentials are inactive
+- Local integrations (e.g. Home Assistant, Node-RED) cannot connect
 
 ## 📚 Documentation Files Overview
 
