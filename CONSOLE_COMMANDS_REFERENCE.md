@@ -33,10 +33,7 @@ Access the console via the HTTP API endpoint:
 
 Example using curl:
 ```bash
-curl -u admin:<password> -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"cmd":"info"}' \
-  http://homevolt-<deviceid>.local/console.json
+curl -u admin:<password> -X POST -d 'cmd=info' http://homevolt-<deviceid>.local/console.json
 ```
 
 ### Console Features

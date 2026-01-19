@@ -9,10 +9,7 @@ Complete documentation of all console commands available on the Tibber ECU. Thes
 ### 1. Access the Console API
 ```bash
 # Using curl (Linux/Mac/Windows)
-curl -u admin:<password> -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"cmd":"info"}' \
-  http://homevolt-<deviceid>.local/console.json
+curl -u admin:<password> -X POST -d 'cmd=info' http://homevolt-<deviceid>.local/console.json
 ```
 
 ### 2. Try Your First Command
@@ -148,16 +145,7 @@ Base URL: http://homevolt-<deviceid>.local or https://homevolt-<deviceid>.local
 ### Example API Calls
 ```bash
 # Using curl
-curl -u admin:<password> -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"cmd":"info"}' \
-  http://homevolt-<deviceid>.local/console.json
-
-# Using curl with multiple commands
-curl -u admin:<password> -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"cmd":"param_list"}' \
-  http://homevolt-<deviceid>.local/console.json
+curl -u admin:<password> -X POST -d 'cmd=info' http://homevolt-<deviceid>.local/console.json
 ```
 
 ## ⌨️ Keyboard Shortcuts

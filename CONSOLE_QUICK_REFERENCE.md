@@ -128,10 +128,7 @@ Auth: HTTP Basic (admin:<password>)
 Base URL: http://homevolt-<deviceid>.local
 
 Example:
-curl -u admin:<password> -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"cmd":"info"}' \
-  http://homevolt-<deviceid>.local/console.json
+curl -u admin:<password> -X POST -d 'cmd=info' http://homevolt-<deviceid>.local/console.json
 ```
 
 ## Common Keyboard Shortcuts

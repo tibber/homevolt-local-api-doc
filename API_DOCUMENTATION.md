@@ -1627,9 +1627,7 @@ Executes a CLI command and returns output.
 
 **Request:**
 ```bash
-curl -u admin:<password> -X POST \
-  -d "cmd=status" \
-  http://homevolt-<deviceid>.local/console.json
+curl -u admin:<password> -X POST -d "cmd=status" http://homevolt-<deviceid>.local/console.json
 ```
 
 **Response:**
@@ -1764,11 +1762,9 @@ curl -u admin:<password> -X POST \
   http://homevolt-<deviceid>.local/params.json
 ```
 
-### Execute Diagnostic Command
+### Execute a CLI Command
 ```bash
-curl -u admin:<password> -X POST \
-  -d "cmd=diagnostic" \
-  http://homevolt-<deviceid>.local/console.json | jq '.output'
+curl -u admin:<password> -X POST -d "cmd=sched_list" http://homevolt-<deviceid>.local/console.json
 ```
 
 ---
@@ -1941,5 +1937,4 @@ For complete parameter descriptions, default values, and configuration examples,
 For issues or questions:
 - Check device logs: `GET /logs.json`
 - Review error report: `GET /error_report.json`
-- Execute diagnostic: `POST /console.json` with `cmd=diagnostic`
 - Contact Tibber support: https://www.tibber.com/support

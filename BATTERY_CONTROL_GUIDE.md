@@ -255,22 +255,13 @@ Setting battery to IDLE mode (inverter offline)
 
 ### Via HTTP API
 
-Direct control is **only available via console commands**. There is no dedicated HTTP endpoint for `sched_set`.
+Direct control is **only available via console commands**. There is no dedicated HTTP endpoint for scheduling.
 
 You can use the `/console.json` endpoint to execute console commands via HTTP:
 
 ```bash
 # Execute sched_set via console.json endpoint
-curl -u admin:<password> -X POST http://device.local/console.json \
-  -H "Content-Type: application/json" \
-  -d '{"cmd":"sched_set 1 -c 3000 --max 90"}'
-```
-
-```bash
-# Execute sched_add via console.json endpoint
-curl -u admin:<password> -X POST http://device.local/console.json \
-  -H "Content-Type: application/json" \
-  -d '{"cmd":"sched_add 1 --from 2025-12-15T23:00:00 --to 2025-12-16T07:00:00 -c 3000 --max 80"}'
+curl -u admin:<password> -X POST -d 'cmd=sched_set 1 --setpoint 3000' http://device.local/console.json
 ```
 
 ### Examples
@@ -516,9 +507,7 @@ Schedule ID 2 deleted
 
 ```bash
 # Execute sched_del via console.json endpoint
-curl -u admin:<password> -X POST http://device.local/console.json \
-  -H "Content-Type: application/json" \
-  -d '{"cmd":"sched_del 2"}'
+curl -u admin:<password> -X POST -d 'cmd=sched_del 2' http://device.local/console.json
 ```
 
 ### Clear All Schedules
@@ -526,9 +515,6 @@ curl -u admin:<password> -X POST http://device.local/console.json \
 **Console Command:**
 ```bash
 ecu> sched_clear
-
-# Warning: Removes ALL schedules
-All schedules cleared
 ```
 
 ### Modify a Schedule

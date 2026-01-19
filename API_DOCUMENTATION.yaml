@@ -1548,7 +1548,7 @@ paths:
               properties:
                 cmd:
                   type: string
-                  description: CLI command to execute (e.g., "help", "status", "restart")
+                  description: CLI command to execute (e.g., "help", "status", "info")
               required:
                 - cmd
       responses:

@@ -249,9 +249,9 @@ curl -s -u admin:<password> http://homevolt-<deviceid>.local/error_report.json |
 curl -u admin:<password> "http://homevolt-<deviceid>.local/logs.json?limit=10000" > logs.json
 ```
 
-### Execute System Diagnostic
+### Execute CLI command status
 ```bash
-curl -s -u admin:<password> -X POST -d "cmd=status" http://homevolt-<deviceid>.local/console.json | jq '.output'
+curl -u admin:<password> -X POST -d "cmd=status" http://homevolt-<deviceid>.local/console.json'
 ```
 
 ---
