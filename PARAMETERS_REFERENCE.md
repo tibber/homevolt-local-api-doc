@@ -397,7 +397,7 @@ MQTT parameters control how frequently data is published to the cloud via MQTT.
 Returns all system parameters organized by group.
 
 ```bash
-curl -u admin:<password> http://device.local/params.json | jq .
+curl -u admin:<password> http://homevolt-<deviceid>.local/params.json | jq .
 ```
 
 **Response Structure:**
@@ -432,11 +432,11 @@ Updates a single parameter value.
 ```bash
 # Set power threshold to 100W (runtime only)
 curl -u admin:<password> -d "k=ems_idle_power_threshold&v=100&store=0" \
-  http://device.local/params.json
+  http://homevolt-<deviceid>.local/params.json
 
 # Persist LED mode to storage
 curl -u admin:<password> -d "k=ledstrip_mode&v=on&store=1" \
-  http://device.local/params.json
+  http://homevolt-<deviceid>.local/params.json
 ```
 
 ### Console Commands

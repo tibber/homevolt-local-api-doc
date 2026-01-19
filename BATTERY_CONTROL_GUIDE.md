@@ -40,7 +40,7 @@ param_store
 
 **Via HTTP:**
 ```bash
-curl -u admin:<password> -X POST http://device.local/params.json \
+curl -u admin:<password> -X POST http://homevolt-<deviceid>.local/params.json \
   -H "Content-Type: application/json" \
   -d '{"settings_local":1}'
 ```
@@ -261,7 +261,7 @@ You can use the `/console.json` endpoint to execute console commands via HTTP:
 
 ```bash
 # Execute sched_set via console.json endpoint
-curl -u admin:<password> -X POST -d 'cmd=sched_set 1 --setpoint 3000' http://device.local/console.json
+curl -u admin:<password> -X POST -d 'cmd=sched_set 1 --setpoint 3000' http://homevolt-<deviceid>.local/console.json
 ```
 
 ### Examples
@@ -469,7 +469,7 @@ Parameter 'settings_local' set to 1
 
 **HTTP API:**
 ```bash
-curl -u admin:<password> -X POST http://device.local/params.json \
+curl -u admin:<password> -X POST http://homevolt-<deviceid>.local/params.json \
   -H "Content-Type: application/json" \
   -d '{"settings_local":1}'
 ```
@@ -484,10 +484,10 @@ curl -u admin:<password> -X POST http://device.local/params.json \
 ecu> param_get settings_local
 
 # HTTP (params.json uses parameter name)
-curl -u admin:<password> http://device.local/params.json | grep settings_local
+curl -u admin:<password> http://homevolt-<deviceid>.local/params.json | grep settings_local
 
 # Or check in schedule.json response (uses 'local_mode' as JSON key)
-curl -u admin:<password> http://device.local/schedule.json | grep local_mode
+curl -u admin:<password> http://homevolt-<deviceid>.local/schedule.json | grep local_mode
 ```
 
 ### Delete a Schedule
@@ -507,7 +507,7 @@ Schedule ID 2 deleted
 
 ```bash
 # Execute sched_del via console.json endpoint
-curl -u admin:<password> -X POST -d 'cmd=sched_del 2' http://device.local/console.json
+curl -u admin:<password> -X POST -d 'cmd=sched_del 2' http://homevolt-<deviceid>.local/console.json
 ```
 
 ### Clear All Schedules
